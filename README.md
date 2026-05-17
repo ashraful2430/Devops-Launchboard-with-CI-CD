@@ -1,44 +1,67 @@
 # DevOps LaunchBoard
 
-DevOps LaunchBoard is a mid-level 3-tier teaching application for deployment classes.
+DevOps LaunchBoard is a mid-level 3-tier teaching application for students learning how a frontend, backend, and database work together.
 
-- **Frontend:** React, TypeScript, Vite, Three.js, Nginx
+- **Frontend:** React, TypeScript, Vite, Three.js
 - **Backend:** Python, FastAPI, SQLAlchemy async, Alembic
 - **Database:** PostgreSQL
-- **Deployment labs:** bare metal, Docker Compose, Kubernetes, and cloud extension notes for VPC, RDS, S3, Terraform, and Ansible
+
+This branch contains only the application code needed to run the project locally or on a cloud server. Docker, Kubernetes, and extended deployment materials live on the `deployment-labs` branch.
 
 ## Project Structure
 
 ```text
-backend/                  FastAPI API, models, schemas, migrations
-frontend/                 React UI, API client, 3D status scene
-deploy/kubernetes/base/   Starter Kubernetes manifests
-docs/deployment-guide.md  Teaching guide for bare metal, Docker, K8s, and AWS labs
-docker-compose.yml        Local container stack
+backend/
+  app/               FastAPI routes, settings, models, schemas, seed data
+  alembic/           Database migrations
+frontend/
+  src/               React UI, API client, components, styles
 ```
 
-## Run Locally: Bare Metal
+## Prerequisites
 
-### 1. Start PostgreSQL
+Install these before running the project:
 
-Create a local PostgreSQL database named `launchboard`.
+- Python 3.12 or newer
+- Node.js 20 or newer
+- PostgreSQL 15 or newer
 
-Example connection used by the app:
+## 1. Create The Database
+
+Create a PostgreSQL database named `launchboard`.
+
+The default local database URL is:
 
 ```text
 postgresql+asyncpg://postgres:postgres@localhost:5432/launchboard
 ```
 
-### 2. Configure Backend Environment
+If your PostgreSQL username, password, host, port, or database name is different, update `backend/.env` in the next step.
+
+## 2. Configure The Backend
 
 ```powershell
 cd backend
 copy .env.example .env
 ```
 
-Edit `backend/.env` only if your database credentials are different.
+Default backend environment:
 
-### 3. Run Backend
+```text
+APP_NAME=DevOps LaunchBoard API
+APP_ENV=local
+DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/launchboard
+CORS_ORIGINS=http://localhost:5173
+SEED_DEMO_DATA=true
+```
+
+For a cloud server, change:
+
+- `DATABASE_URL` to your managed PostgreSQL or cloud database connection string.
+- `CORS_ORIGINS` to the real frontend URL.
+- `SEED_DEMO_DATA=false` if you do not want demo records inserted automatically.
+
+## 3. Run The Backend
 
 ```powershell
 python -m venv .venv
@@ -51,28 +74,30 @@ uvicorn app.main:app --reload
 Backend URLs:
 
 ```text
-API:  http://localhost:8000
-Docs: http://localhost:8000/docs
+API:    http://localhost:8000
+Docs:   http://localhost:8000/docs
 Health: http://localhost:8000/health
 Ready:  http://localhost:8000/ready
 ```
 
-### 4. Configure Frontend Environment
+## 4. Configure The Frontend
 
-Open a new terminal:
+Open a second terminal:
 
 ```powershell
 cd frontend
 copy .env.example .env
 ```
 
-Keep this for local development:
+Default frontend environment:
 
 ```text
 VITE_API_URL=http://localhost:8000
 ```
 
-### 5. Run Frontend
+For a cloud server, change `VITE_API_URL` to the public backend URL.
+
+## 5. Run The Frontend
 
 ```powershell
 npm install
@@ -85,98 +110,47 @@ Open:
 http://localhost:5173
 ```
 
-## Run With Docker Compose
+## Build For A Cloud Server
 
-From the project root:
+Build the frontend:
 
 ```powershell
-copy .env.example .env
-docker compose up --build
+cd frontend
+npm run build
 ```
 
-Open:
+The static files will be created in:
 
 ```text
-Frontend: http://localhost:8080
-Backend:  http://localhost:8000/docs
+frontend/dist
 ```
 
-Stop the stack:
+Run the backend on a server:
 
 ```powershell
-docker compose down
+cd backend
+pip install -e .
+alembic upgrade head
+uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-Remove the database volume when you want a clean class reset:
-
-```powershell
-docker compose down -v
-```
-
-## Run On Kubernetes
-
-Build local images:
-
-```powershell
-docker build -t launchboard-api:local .\backend
-docker build --build-arg VITE_API_URL=http://localhost:8000 -t launchboard-web:local .\frontend
-```
-
-Apply manifests:
-
-```powershell
-kubectl apply -k deploy/kubernetes/base
-kubectl get pods -n launchboard
-```
-
-For local clusters without Ingress configured, port-forward:
-
-```powershell
-kubectl port-forward -n launchboard svc/launchboard-web 8080:80
-kubectl port-forward -n launchboard svc/launchboard-api 8000:8000
-```
-
-Open:
-
-```text
-Frontend: http://localhost:8080
-Backend:  http://localhost:8000/docs
-```
-
-When teaching Ingress with `launchboard.local`, rebuild the frontend with `--build-arg VITE_API_URL=/api` so browser API calls flow through the Ingress `/api` route.
-
-More teaching notes are in [docs/deployment-guide.md](docs/deployment-guide.md).
-
-## Environment Variables
-
-Backend variables live in `backend/.env` for bare metal and container/Kubernetes environment settings for deployments:
-
-```text
-APP_NAME=DevOps LaunchBoard API
-APP_ENV=local
-DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/launchboard
-CORS_ORIGINS=http://localhost:5173
-SEED_DEMO_DATA=true
-```
-
-Frontend variables live in `frontend/.env`:
-
-```text
-VITE_API_URL=http://localhost:8000
-```
-
-When moving to RDS, change only `DATABASE_URL`. When hosting the frontend behind one domain and routing `/api` to the backend, use `VITE_API_URL=/api`.
+In production, serve `frontend/dist` with a web server such as Nginx, Apache, or a cloud static hosting service, and run the backend behind a process manager or service manager.
 
 ## Useful Commands
 
 ```powershell
-# Backend checks
+# Backend
 cd backend
-ruff check .
+alembic upgrade head
 alembic current
 
-# Frontend checks
+# Frontend
 cd frontend
 npm run lint
 npm run build
 ```
+
+## Branches
+
+- `main`: application code only
+- `deployment-labs`: Docker, Kubernetes, and extended deployment teaching materials
