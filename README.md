@@ -1,69 +1,81 @@
 # DevOps LaunchBoard
 
-An intermediate 3-tier teaching application for DevOps deployment classes.
+DevOps LaunchBoard is a mid-level 3-tier teaching application for deployment classes.
 
-- **Frontend:** React + TypeScript + Vite
-- **Backend:** Python + FastAPI + SQLAlchemy async
+- **Frontend:** React, TypeScript, Vite, Three.js, Nginx
+- **Backend:** Python, FastAPI, SQLAlchemy async, Alembic
 - **Database:** PostgreSQL
-
-The project intentionally does **not** include Docker, Compose, Kubernetes, CI/CD, or cloud manifests. Those are left for students to create during deployment lessons.
-
-## What Students Can Practice
-
-- Connecting a frontend to a backend through environment configuration
-- Running database-backed APIs with PostgreSQL
-- Managing runtime variables without hardcoding secrets
-- Applying database migrations with Alembic
-- Deploying three separate tiers independently
-- Adding health checks, readiness checks, logs, and release automation
+- **Deployment labs:** bare metal, Docker Compose, Kubernetes, and cloud extension notes for VPC, RDS, S3, Terraform, and Ansible
 
 ## Project Structure
 
 ```text
-backend/
-  app/
-    api/              FastAPI route modules
-    core/             settings and app config
-    models/           SQLAlchemy database models
-    schemas/          Pydantic request/response schemas
-    services/         seed data and business helpers
-  alembic/            database migrations
-frontend/
-  src/
-    components/       React UI components
-    lib/              API client and types
-    styles/           application CSS
+backend/                  FastAPI API, models, schemas, migrations
+frontend/                 React UI, API client, 3D status scene
+deploy/kubernetes/base/   Starter Kubernetes manifests
+docs/deployment-guide.md  Teaching guide for bare metal, Docker, K8s, and AWS labs
+docker-compose.yml        Local container stack
 ```
 
-## Backend Setup
+## Run Locally: Bare Metal
 
-```bash
+### 1. Start PostgreSQL
+
+Create a local PostgreSQL database named `launchboard`.
+
+Example connection used by the app:
+
+```text
+postgresql+asyncpg://postgres:postgres@localhost:5432/launchboard
+```
+
+### 2. Configure Backend Environment
+
+```powershell
 cd backend
-python -m venv .venv
-.venv\Scripts\activate
-pip install -e .
 copy .env.example .env
 ```
 
-Update `backend/.env` with your PostgreSQL connection string, then run:
+Edit `backend/.env` only if your database credentials are different.
 
-```bash
+### 3. Run Backend
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\activate
+pip install -e .
 alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
-API docs are available at:
+Backend URLs:
 
 ```text
-http://localhost:8000/docs
+API:  http://localhost:8000
+Docs: http://localhost:8000/docs
+Health: http://localhost:8000/health
+Ready:  http://localhost:8000/ready
 ```
 
-## Frontend Setup
+### 4. Configure Frontend Environment
 
-```bash
+Open a new terminal:
+
+```powershell
 cd frontend
-npm install
 copy .env.example .env
+```
+
+Keep this for local development:
+
+```text
+VITE_API_URL=http://localhost:8000
+```
+
+### 5. Run Frontend
+
+```powershell
+npm install
 npm run dev
 ```
 
@@ -73,13 +85,98 @@ Open:
 http://localhost:5173
 ```
 
-## Default API URL
+## Run With Docker Compose
 
-The frontend reads:
+From the project root:
+
+```powershell
+copy .env.example .env
+docker compose up --build
+```
+
+Open:
+
+```text
+Frontend: http://localhost:8080
+Backend:  http://localhost:8000/docs
+```
+
+Stop the stack:
+
+```powershell
+docker compose down
+```
+
+Remove the database volume when you want a clean class reset:
+
+```powershell
+docker compose down -v
+```
+
+## Run On Kubernetes
+
+Build local images:
+
+```powershell
+docker build -t launchboard-api:local .\backend
+docker build --build-arg VITE_API_URL=http://localhost:8000 -t launchboard-web:local .\frontend
+```
+
+Apply manifests:
+
+```powershell
+kubectl apply -k deploy/kubernetes/base
+kubectl get pods -n launchboard
+```
+
+For local clusters without Ingress configured, port-forward:
+
+```powershell
+kubectl port-forward -n launchboard svc/launchboard-web 8080:80
+kubectl port-forward -n launchboard svc/launchboard-api 8000:8000
+```
+
+Open:
+
+```text
+Frontend: http://localhost:8080
+Backend:  http://localhost:8000/docs
+```
+
+When teaching Ingress with `launchboard.local`, rebuild the frontend with `--build-arg VITE_API_URL=/api` so browser API calls flow through the Ingress `/api` route.
+
+More teaching notes are in [docs/deployment-guide.md](docs/deployment-guide.md).
+
+## Environment Variables
+
+Backend variables live in `backend/.env` for bare metal and container/Kubernetes environment settings for deployments:
+
+```text
+APP_NAME=DevOps LaunchBoard API
+APP_ENV=local
+DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/launchboard
+CORS_ORIGINS=http://localhost:5173
+SEED_DEMO_DATA=true
+```
+
+Frontend variables live in `frontend/.env`:
 
 ```text
 VITE_API_URL=http://localhost:8000
 ```
 
-Change this when students deploy the API to another host.
+When moving to RDS, change only `DATABASE_URL`. When hosting the frontend behind one domain and routing `/api` to the backend, use `VITE_API_URL=/api`.
 
+## Useful Commands
+
+```powershell
+# Backend checks
+cd backend
+ruff check .
+alembic current
+
+# Frontend checks
+cd frontend
+npm run lint
+npm run build
+```

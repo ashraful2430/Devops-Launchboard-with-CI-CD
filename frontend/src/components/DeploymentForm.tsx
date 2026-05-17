@@ -1,5 +1,5 @@
 import { Rocket } from 'lucide-react';
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import type { DeploymentPayload, DeploymentStatus, Environment, Service } from '../lib/types';
 
 type DeploymentFormProps = {
@@ -28,6 +28,15 @@ export default function DeploymentForm({ services, onSubmit }: DeploymentFormPro
   function update<K extends keyof DeploymentPayload>(key: K, value: DeploymentPayload[K]) {
     setForm((current) => ({ ...current, [key]: value }));
   }
+
+  useEffect(() => {
+    if (services.length === 0) return;
+
+    setForm((current) => {
+      const selectedServiceExists = services.some((service) => service.id === current.service_id);
+      return selectedServiceExists ? current : { ...current, service_id: services[0].id };
+    });
+  }, [services]);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -159,4 +168,3 @@ export default function DeploymentForm({ services, onSubmit }: DeploymentFormPro
     </section>
   );
 }
-

@@ -56,10 +56,10 @@ export default function DeploymentTable({ deployments }: DeploymentTableProps) {
                     <span className={`status-pill ${deployment.status}`}>{deployment.status}</span>
                   </td>
                   <td>
-                    {deployment.replicas} pods · {deployment.cpu_request} · {deployment.memory_request}
+                    {deployment.replicas} pods / {deployment.cpu_request} / {deployment.memory_request}
                   </td>
                   <td>
-                    {deployment.latency_ms}ms · {deployment.error_rate}% errors
+                    {deployment.latency_ms}ms / {deployment.error_rate}% errors
                   </td>
                   <td>{deployment.deployed_by}</td>
                 </tr>
@@ -71,4 +71,3 @@ export default function DeploymentTable({ deployments }: DeploymentTableProps) {
     </section>
   );
 }
-
