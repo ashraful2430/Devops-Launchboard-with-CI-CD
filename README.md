@@ -13,117 +13,182 @@ A simple 3-tier learning project that shows how a React frontend, FastAPI backen
 - `main`: app code only, for students to run and learn from
 - `deployment-labs`: Docker, Kubernetes, and deployment files
 
-## Requirements
+## AWS EC2 Setup
 
-Install these first:
+These steps assume an Ubuntu EC2 server.
 
-- Python 3.12 or newer
-- Node.js 20 or newer
-- PostgreSQL 15 or newer
-
-## 1. Create The Database
-
-Create a PostgreSQL database named:
+In your EC2 security group, allow inbound traffic for:
 
 ```text
-launchboard
+22    SSH
+5173  Frontend dev server
+8001  Backend API
 ```
 
-Copy-paste command:
+Use your EC2 public IP in the examples below:
+
+```text
+EC2_PUBLIC_IP=your-ec2-public-ip
+```
+
+## 1. Install Server Tools
+
+SSH into the EC2 server, then run:
 
 ```bash
-createdb -U postgres launchboard
+sudo apt update
+sudo apt install -y git python3 python3-venv python3-pip postgresql postgresql-contrib
 ```
 
-If `createdb` is not available, open PostgreSQL with `psql` and run:
+Install Node.js 20:
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+```
+
+Check versions:
+
+```bash
+python3 --version
+node --version
+npm --version
+psql --version
+```
+
+## 2. Create The PostgreSQL Database
+
+Start PostgreSQL:
+
+```bash
+sudo systemctl enable postgresql
+sudo systemctl start postgresql
+```
+
+Create a database user and database:
+
+```bash
+sudo -u postgres psql
+```
+
+Inside `psql`, run:
 
 ```sql
-CREATE DATABASE launchboard;
+CREATE USER launchboard_user WITH PASSWORD 'launchboard_pass';
+CREATE DATABASE launchboard OWNER launchboard_user;
+GRANT ALL PRIVILEGES ON DATABASE launchboard TO launchboard_user;
+\q
 ```
 
-Default backend database URL:
+The backend database URL will be:
 
 ```text
-postgresql+asyncpg://postgres:postgres@localhost:5432/launchboard
+postgresql+asyncpg://launchboard_user:launchboard_pass@localhost:5432/launchboard
 ```
 
-If your PostgreSQL username or password is different, edit `backend/.env`.
+## 3. Download The Project
 
-## 2. Run The Backend
+```bash
+git clone https://github.com/ashraful2430/N-tier-application.git
+cd N-tier-application
+```
 
-Open a terminal in the project folder:
+## 4. Configure And Run The Backend
 
 ```bash
 cd backend
 cp .env.example .env
-python -m venv .venv
-source .venv/Scripts/activate
+nano .env
+```
+
+For EC2, `backend/.env` should look like this. Replace `YOUR_EC2_PUBLIC_IP` with your real EC2 public IP:
+
+```env
+APP_NAME=DevOps LaunchBoard API
+APP_ENV=ec2
+DATABASE_URL=postgresql+asyncpg://launchboard_user:launchboard_pass@localhost:5432/launchboard
+CORS_ORIGINS=http://YOUR_EC2_PUBLIC_IP:5173
+SEED_DEMO_DATA=true
+```
+
+Install and run the backend:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -e .
 alembic upgrade head
-uvicorn app.main:app --host 127.0.0.1 --port 8001
+uvicorn app.main:app --host 0.0.0.0 --port 8001
 ```
 
 Backend links:
 
 ```text
-API Health: http://127.0.0.1:8001/health
-API Docs:   http://127.0.0.1:8001/docs
+API Health: http://YOUR_EC2_PUBLIC_IP:8001/health
+API Docs:   http://YOUR_EC2_PUBLIC_IP:8001/docs
 ```
 
-## 3. Run The Frontend
+Keep this terminal open.
 
-Open a second terminal in the project folder:
+## 5. Configure And Run The Frontend
+
+Open a second SSH terminal, then run:
 
 ```bash
-cd frontend
+cd N-tier-application/frontend
 cp .env.example .env
-npm install
-npm run dev
+nano .env
 ```
 
-Open the app:
+For EC2, `frontend/.env` should look like this. Replace `YOUR_EC2_PUBLIC_IP` with your real EC2 public IP:
+
+```env
+VITE_API_URL=http://YOUR_EC2_PUBLIC_IP:8001
+```
+
+Install and run the frontend:
+
+```bash
+npm install
+npm run dev -- --host 0.0.0.0
+```
+
+Open the app in your browser:
 
 ```text
-http://localhost:5173
+http://YOUR_EC2_PUBLIC_IP:5173
 ```
 
-## Environment Files
+## Important Notes
 
-Backend file: `backend/.env`
-
-```env
-APP_NAME=DevOps LaunchBoard API
-APP_ENV=local
-DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/launchboard
-CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
-SEED_DEMO_DATA=true
-```
-
-Frontend file: `frontend/.env`
-
-```env
-VITE_API_URL=http://127.0.0.1:8001
-```
-
-If you change an `.env` file, stop the running server and start it again.
+- If you change `backend/.env`, stop and restart the backend.
+- If you change `frontend/.env`, stop and restart the frontend.
+- If the browser says the API failed, check that port `8001` is open in the EC2 security group.
+- If the frontend does not open, check that port `5173` is open in the EC2 security group.
 
 ## Useful Commands
 
 Backend:
 
 ```bash
-cd backend
-source .venv/Scripts/activate
+cd ~/N-tier-application/backend
+source .venv/bin/activate
 alembic upgrade head
-uvicorn app.main:app --host 127.0.0.1 --port 8001
+uvicorn app.main:app --host 0.0.0.0 --port 8001
 ```
 
 Frontend:
 
 ```bash
-cd frontend
-npm run dev
-npm run build
+cd ~/N-tier-application/frontend
+npm run dev -- --host 0.0.0.0
+```
+
+PostgreSQL:
+
+```bash
+sudo systemctl status postgresql
+sudo -u postgres psql
 ```
 
 ## Deployment Files
