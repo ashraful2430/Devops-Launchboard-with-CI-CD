@@ -29,6 +29,18 @@ Create a PostgreSQL database named:
 launchboard
 ```
 
+Copy-paste command:
+
+```bash
+createdb -U postgres launchboard
+```
+
+If `createdb` is not available, open PostgreSQL with `psql` and run:
+
+```sql
+CREATE DATABASE launchboard;
+```
+
 Default backend database URL:
 
 ```text
