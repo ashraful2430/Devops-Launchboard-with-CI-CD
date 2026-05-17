@@ -1,26 +1,21 @@
 # DevOps LaunchBoard
 
-DevOps LaunchBoard is a mid-level 3-tier teaching application for students learning how a frontend, backend, and database work together.
+A simple 3-tier learning project that shows how a React frontend, FastAPI backend, and PostgreSQL database work together.
 
-- **Frontend:** React, TypeScript, Vite, Three.js
-- **Backend:** Python, FastAPI, SQLAlchemy async, Alembic
-- **Database:** PostgreSQL
+## Tech Stack
 
-This branch contains only the application code needed to run the project locally or on a cloud server. Docker, Kubernetes, and extended deployment materials live on the `deployment-labs` branch.
+- Frontend: React, TypeScript, Vite, Three.js
+- Backend: Python, FastAPI, SQLAlchemy, Alembic
+- Database: PostgreSQL
 
-## Project Structure
+## Branches
 
-```text
-backend/
-  app/               FastAPI routes, settings, models, schemas, seed data
-  alembic/           Database migrations
-frontend/
-  src/               React UI, API client, components, styles
-```
+- `main`: app code only, for students to run and learn from
+- `deployment-labs`: Docker, Kubernetes, and deployment files
 
-## Prerequisites
+## Requirements
 
-Install these before running the project:
+Install these first:
 
 - Python 3.12 or newer
 - Node.js 20 or newer
@@ -28,129 +23,109 @@ Install these before running the project:
 
 ## 1. Create The Database
 
-Create a PostgreSQL database named `launchboard`.
+Create a PostgreSQL database named:
 
-The default local database URL is:
+```text
+launchboard
+```
+
+Default backend database URL:
 
 ```text
 postgresql+asyncpg://postgres:postgres@localhost:5432/launchboard
 ```
 
-If your PostgreSQL username, password, host, port, or database name is different, update `backend/.env` in the next step.
+If your PostgreSQL username or password is different, edit `backend/.env`.
 
-## 2. Configure The Backend
+## 2. Run The Backend
 
-```powershell
+Open a terminal in the project folder:
+
+```bash
 cd backend
-copy .env.example .env
-```
-
-Default backend environment:
-
-```text
-APP_NAME=DevOps LaunchBoard API
-APP_ENV=local
-DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/launchboard
-CORS_ORIGINS=http://localhost:5173
-SEED_DEMO_DATA=true
-```
-
-For a cloud server, change:
-
-- `DATABASE_URL` to your managed PostgreSQL or cloud database connection string.
-- `CORS_ORIGINS` to the real frontend URL.
-- `SEED_DEMO_DATA=false` if you do not want demo records inserted automatically.
-
-## 3. Run The Backend
-
-```powershell
+cp .env.example .env
 python -m venv .venv
-.\.venv\Scripts\activate
+source .venv/Scripts/activate
 pip install -e .
 alembic upgrade head
-uvicorn app.main:app --reload
+uvicorn app.main:app --host 127.0.0.1 --port 8001
 ```
 
-Backend URLs:
+Backend links:
 
 ```text
-API:    http://localhost:8000
-Docs:   http://localhost:8000/docs
-Health: http://localhost:8000/health
-Ready:  http://localhost:8000/ready
+API Health: http://127.0.0.1:8001/health
+API Docs:   http://127.0.0.1:8001/docs
 ```
 
-## 4. Configure The Frontend
+## 3. Run The Frontend
 
-Open a second terminal:
+Open a second terminal in the project folder:
 
-```powershell
+```bash
 cd frontend
-copy .env.example .env
-```
-
-Default frontend environment:
-
-```text
-VITE_API_URL=http://localhost:8000
-```
-
-For a cloud server, change `VITE_API_URL` to the public backend URL.
-
-## 5. Run The Frontend
-
-```powershell
+cp .env.example .env
 npm install
 npm run dev
 ```
 
-Open:
+Open the app:
 
 ```text
 http://localhost:5173
 ```
 
-## Build For A Cloud Server
+## Environment Files
 
-Build the frontend:
+Backend file: `backend/.env`
 
-```powershell
-cd frontend
-npm run build
+```env
+APP_NAME=DevOps LaunchBoard API
+APP_ENV=local
+DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/launchboard
+CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+SEED_DEMO_DATA=true
 ```
 
-The static files will be created in:
+Frontend file: `frontend/.env`
 
-```text
-frontend/dist
+```env
+VITE_API_URL=http://127.0.0.1:8001
 ```
 
-Run the backend on a server:
-
-```powershell
-cd backend
-pip install -e .
-alembic upgrade head
-uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
-
-In production, serve `frontend/dist` with a web server such as Nginx, Apache, or a cloud static hosting service, and run the backend behind a process manager or service manager.
+If you change an `.env` file, stop the running server and start it again.
 
 ## Useful Commands
 
-```powershell
-# Backend
-cd backend
-alembic upgrade head
-alembic current
+Backend:
 
-# Frontend
+```bash
+cd backend
+source .venv/Scripts/activate
+alembic upgrade head
+uvicorn app.main:app --host 127.0.0.1 --port 8001
+```
+
+Frontend:
+
+```bash
 cd frontend
-npm run lint
+npm run dev
 npm run build
 ```
 
-## Branches
+## Deployment Files
 
-- `main`: application code only
-- `deployment-labs`: Docker, Kubernetes, and extended deployment teaching materials
+Docker, Kubernetes, and deployment guide files are not kept on `main`.
+
+To view them:
+
+```bash
+git checkout deployment-labs
+```
+
+To return to the student app branch:
+
+```bash
+git checkout main
+```

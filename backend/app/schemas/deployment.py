@@ -14,7 +14,7 @@ class ServiceCreate(BaseModel):
     tier: Tier
     runtime: str = Field(min_length=2, max_length=80)
     repository_url: HttpUrl
-    health_endpoint: str = Field(pattern=r"^/.+")
+    health_endpoint: str = Field(pattern=r"^/.*")
 
 
 class ServiceRead(ServiceCreate):
@@ -54,4 +54,3 @@ class DeploymentSummary(BaseModel):
     progressing: int
     average_latency_ms: float
     average_error_rate: float
-
