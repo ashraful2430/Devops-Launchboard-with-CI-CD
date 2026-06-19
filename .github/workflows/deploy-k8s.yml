@@ -37,10 +37,11 @@ jobs:
           fi
           kubectl cluster-info --context "kind-${KIND_CLUSTER}"
 
-      - name: Install Nginx Ingress Controller if missing
+          - name: Install Nginx Ingress Controller if missing
         run: |
           if ! kubectl get namespace ingress-nginx >/dev/null 2>&1; then
             kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.10.1/deploy/static/provider/kind/deploy.yaml
+            sleep 10
           fi
           kubectl wait --namespace ingress-nginx \
             --for=condition=ready pod \
