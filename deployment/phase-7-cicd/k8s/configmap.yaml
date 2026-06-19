@@ -4,7 +4,7 @@ metadata:
   name: launchboard-config
   namespace: devops-launchboard
 data:
-  APP_NAME: DevOps LaunchBoard API
+  APP_NAME: DevOps LaunchBoard API v2
   APP_ENV: production
   CORS_ORIGINS: http://13.206.124.55
   SEED_DEMO_DATA: "true"
