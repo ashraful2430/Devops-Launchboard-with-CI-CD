@@ -1,0 +1,52 @@
+pipeline {
+    agent any
+
+    environment {
+        IMAGE_TAG = "${env.GIT_COMMIT.take(7)}"
+        KIND_CLUSTER = 'launchboard-cicd'
+        NAMESPACE = 'devops-launchboard'
+    }
+
+    stages {
+        stage('Backend checks') {
+            steps {
+                dir('backend') {
+                    sh 'pip install -e ".[dev]"'
+                    sh 'ruff check .'
+                    sh 'python -c "from app.main import app; print(app.title)"'
+                }
+            }
+        }
+        stage('Frontend checks') {
+            steps {
+                dir('frontend') {
+                    sh 'npm ci'
+                    sh 'npm run lint'
+                    sh 'npm run build'
+                }
+            }
+        }
+        stage('Build images') {
+            steps {
+                sh 'docker build -f deployment/phase-7-cicd/Dockerfile.backend -t launchboard-backend:${IMAGE_TAG} .'
+                sh 'docker build -f deployment/phase-7-cicd/Dockerfile.frontend -t launchboard-frontend:${IMAGE_TAG} .'
+            }
+        }
+        stage('Deploy to Kind') {
+            steps {
+                sh 'kind load docker-image launchboard-backend:${IMAGE_TAG} --name ${KIND_CLUSTER}'
+                sh 'kind load docker-image launchboard-frontend:${IMAGE_TAG} --name ${KIND_CLUSTER}'
+                sh 'sed -i "s|IMAGE_TAG_PLACEHOLDER|${IMAGE_TAG}|g" deployment/phase-7-cicd/k8s/launchboard-backend-deployment.yaml deployment/phase-7-cicd/k8s/launchboard-frontend-deployment.yaml deployment/phase-7-cicd/k8s/launchboard-migration-job.yaml'
+                sh 'kubectl -n ${NAMESPACE} delete job launchboard-migrate --ignore-not-found'
+                sh 'kubectl apply -k deployment/phase-7-cicd/k8s'
+                sh 'kubectl -n ${NAMESPACE} rollout status deployment/launchboard-backend --timeout=180s'
+                sh 'kubectl -n ${NAMESPACE} rollout status deployment/launchboard-frontend --timeout=180s'
+            }
+        }
+        stage('Verify') {
+            steps {
+                sh 'curl -fsS http://127.0.0.1/health'
+            }
+        }
+    }
+}
