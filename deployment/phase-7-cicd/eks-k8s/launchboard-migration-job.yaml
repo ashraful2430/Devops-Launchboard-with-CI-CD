@@ -13,8 +13,8 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: migrate
-          image: launchboard-backend:IMAGE_TAG_PLACEHOLDER
-          imagePullPolicy: IfNotPresent
+          image: ashik6251/launchboard-backend-k8s-cicd:initial
+          imagePullPolicy: Always
           command:
             - /bin/sh
             - -c

@@ -21,15 +21,15 @@ spec:
         app: launchboard-backend
     spec:
       securityContext:
-        runAsUser: 10001
-        runAsGroup: 10001
-        fsGroup: 10001
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
         seccompProfile:
           type: RuntimeDefault
       containers:
         - name: backend
-          image: launchboard-backend:IMAGE_TAG_PLACEHOLDER
-          imagePullPolicy: IfNotPresent
+          image: ashik6251/launchboard-backend-k8s-cicd:initial
+          imagePullPolicy: Always
           command:
             - /bin/sh
             - -c
@@ -64,5 +64,5 @@ spec:
               cpu: 100m
               memory: 128Mi
             limits:
-              cpu: 400m
-              memory: 384Mi
+              cpu: 500m
+              memory: 512Mi

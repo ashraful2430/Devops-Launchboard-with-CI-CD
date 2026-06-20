@@ -4,4 +4,3 @@ metadata:
   name: devops-launchboard
   labels:
     app.kubernetes.io/name: devops-launchboard
-    app.kubernetes.io/part-of: devops-launchboard

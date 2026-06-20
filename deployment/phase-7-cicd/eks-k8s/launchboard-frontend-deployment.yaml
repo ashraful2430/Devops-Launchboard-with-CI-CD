@@ -29,8 +29,8 @@ spec:
           type: RuntimeDefault
       containers:
         - name: frontend
-          image: launchboard-frontend:IMAGE_TAG_PLACEHOLDER
-          imagePullPolicy: IfNotPresent
+          image: ashik6251/launchboard-frontend-k8s-cicd:initial
+          imagePullPolicy: Always
           ports:
             - name: http
               containerPort: 8080
@@ -51,5 +51,5 @@ spec:
               cpu: 50m
               memory: 64Mi
             limits:
-              cpu: 200m
-              memory: 128Mi
+              cpu: 250m
+              memory: 256Mi

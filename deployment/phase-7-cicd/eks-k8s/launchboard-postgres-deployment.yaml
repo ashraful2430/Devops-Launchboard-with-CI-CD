@@ -40,27 +40,19 @@ spec:
                 secretKeyRef:
                   name: launchboard-secret
                   key: POSTGRES_PASSWORD
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/postgresql/data
           readinessProbe:
             exec:
-              command:
-                - pg_isready
-                - -U
-                - launchboard_user
-                - -d
-                - launchboard
+              command: ["pg_isready", "-U", "launchboard_user", "-d", "launchboard"]
             initialDelaySeconds: 10
             periodSeconds: 10
           livenessProbe:
             exec:
-              command:
-                - pg_isready
-                - -U
-                - launchboard_user
-                - -d
-                - launchboard
+              command: ["pg_isready", "-U", "launchboard_user", "-d", "launchboard"]
             initialDelaySeconds: 20
             periodSeconds: 15
           resources:
