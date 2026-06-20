@@ -18,10 +18,10 @@ jobs:
         include:
           - component: backend
             dockerfile: deployment/phase-7-cicd/Dockerfile.backend
-            repo_suffix: launchboard-backend-k8s
+            repo_suffix: launchboard-backend-k8s-cicd
           - component: frontend
             dockerfile: deployment/phase-7-cicd/Dockerfile.frontend
-            repo_suffix: launchboard-frontend-k8s
+            repo_suffix: launchboard-frontend-k8s-cicd
     steps:
       - uses: actions/checkout@v4
 
