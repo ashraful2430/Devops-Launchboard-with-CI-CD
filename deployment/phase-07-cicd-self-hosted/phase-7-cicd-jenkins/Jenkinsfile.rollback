@@ -9,7 +9,7 @@ pipeline {
     AWS_CREDS = credentials('aws-jenkins-credentials')
     AWS_ACCESS_KEY_ID = "${AWS_CREDS_USR}"
     AWS_SECRET_ACCESS_KEY = "${AWS_CREDS_PSW}"
-    AWS_REGION = 'YOUR_AWS_REGION'
+    AWS_REGION = 'us-east-1'
     CLUSTER_NAME = 'devops-launchboard-phase-7-jenkins'
     NAMESPACE = 'devops-launchboard'
   }
