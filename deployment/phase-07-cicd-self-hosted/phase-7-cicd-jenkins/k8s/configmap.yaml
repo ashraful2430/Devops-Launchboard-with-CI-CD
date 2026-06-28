@@ -4,7 +4,7 @@ metadata:
   name: launchboard-config
   namespace: devops-launchboard
 data:
-  APP_NAME: DevOps LaunchBoard API
+  APP_NAME: DevOps LaunchBoard API via Jenkins on EKS v2
   APP_ENV: production
   CORS_ORIGINS: http://YOUR_ALB_DNS_NAME
   SEED_DEMO_DATA: "true"
