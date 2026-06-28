@@ -1,0 +1,52 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: devops-launchboard-phase-7-jenkins
+  region: us-east-1
+  version: "1.34"
+
+availabilityZones:
+  - us-east-1a
+  - us-east-1b
+
+iam:
+  withOIDC: true
+
+vpc:
+  clusterEndpoints:
+    publicAccess: true
+    privateAccess: true
+  nat:
+    gateway: Single
+
+managedNodeGroups:
+  - name: launchboard-workers
+    instanceType: c7i-flex.large
+    desiredCapacity: 2
+    minSize: 2
+    maxSize: 4
+    privateNetworking: true
+    volumeSize: 30
+    volumeType: gp3
+    amiFamily: AmazonLinux2023
+    labels:
+      workload: launchboard
+    tags:
+      Project: devops-launchboard
+      Environment: phase-7-jenkins
+      Owner: student
+
+cloudWatch:
+  clusterLogging:
+    enableTypes:
+      - api
+      - audit
+      - authenticator
+      - controllerManager
+      - scheduler
+
+addons:
+  - name: aws-ebs-csi-driver
+    wellKnownPolicies:
+      ebsCSIController: true

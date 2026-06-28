@@ -1,0 +1,193 @@
+pipeline {
+  agent any
+
+  parameters {
+    password(name: 'DB_PASSWORD', defaultValue: 'CHANGE_ME_STRONG_PASSWORD', description: 'PostgreSQL password for this lab')
+  }
+
+  environment {
+    AWS_CREDS = credentials('aws-jenkins-credentials')
+    AWS_ACCESS_KEY_ID = "${AWS_CREDS_USR}"
+    AWS_SECRET_ACCESS_KEY = "${AWS_CREDS_PSW}"
+    AWS_REGION = 'us-east-1'
+    CLUSTER_NAME = 'devops-launchboard-phase-7-jenkins'
+    NAMESPACE = 'devops-launchboard'
+    DB_PASSWORD = "${params.DB_PASSWORD}"
+  }
+
+  stages {
+    stage('Backend Checks') {
+      steps {
+        dir('backend') {
+          sh 'python3 -m venv .venv'
+          sh '. .venv/bin/activate && python -m pip install --upgrade pip'
+          sh '. .venv/bin/activate && pip install -e ".[dev]"'
+          sh '. .venv/bin/activate && ruff check .'
+          sh '. .venv/bin/activate && python -c "from app.main import app; print(app.title)"'
+        }
+      }
+    }
+
+    stage('Frontend Checks') {
+      steps {
+        dir('frontend') {
+          sh 'npm ci'
+          sh 'npm run lint'
+          sh 'npm run build'
+        }
+      }
+    }
+
+    stage('Set Image Tag') {
+      steps {
+        script {
+          env.IMAGE_TAG = sh(script: 'git rev-parse --short=7 HEAD', returnStdout: true).trim()
+          env.ACCOUNT_ID = sh(script: 'aws sts get-caller-identity --query Account --output text', returnStdout: true).trim()
+          env.ECR_REGISTRY = "${env.ACCOUNT_ID}.dkr.ecr.${env.AWS_REGION}.amazonaws.com"
+        }
+        echo "Image tag for this build: ${env.IMAGE_TAG}"
+        echo "ECR registry: ${env.ECR_REGISTRY}"
+      }
+    }
+
+    stage('Update Kubeconfig') {
+      steps {
+        sh '''
+          aws eks update-kubeconfig --name "${CLUSTER_NAME}" --region "${AWS_REGION}"
+          kubectl get nodes
+        '''
+      }
+    }
+
+    stage('Log In To ECR') {
+      steps {
+        sh '''
+          aws ecr get-login-password --region "${AWS_REGION}" \
+            | docker login --username AWS --password-stdin "${ECR_REGISTRY}"
+        '''
+      }
+    }
+
+    stage('Build Images') {
+      steps {
+        sh '''
+          docker build -f deployment/phase-07-cicd-self-hosted/phase-7-cicd-jenkins/Dockerfile.backend \
+            -t "${ECR_REGISTRY}/launchboard-backend:${IMAGE_TAG}" .
+          docker build -f deployment/phase-07-cicd-self-hosted/phase-7-cicd-jenkins/Dockerfile.frontend \
+            --build-arg VITE_API_URL= \
+            -t "${ECR_REGISTRY}/launchboard-frontend:${IMAGE_TAG}" .
+        '''
+      }
+    }
+
+    stage('Push Images To ECR') {
+      steps {
+        sh '''
+          docker push "${ECR_REGISTRY}/launchboard-backend:${IMAGE_TAG}"
+          docker push "${ECR_REGISTRY}/launchboard-frontend:${IMAGE_TAG}"
+        '''
+      }
+    }
+
+    stage('Stamp Image Tag Into Manifests') {
+      steps {
+        sh '''
+          sed -i "s|ECR_REGISTRY_PLACEHOLDER|${ECR_REGISTRY}|g; s|IMAGE_TAG_PLACEHOLDER|${IMAGE_TAG}|g" \
+            deployment/phase-07-cicd-self-hosted/phase-7-cicd-jenkins/k8s/launchboard-backend-deployment.yaml \
+            deployment/phase-07-cicd-self-hosted/phase-7-cicd-jenkins/k8s/launchboard-frontend-deployment.yaml \
+            deployment/phase-07-cicd-self-hosted/phase-7-cicd-jenkins/k8s/launchboard-migration-job.yaml
+        '''
+      }
+    }
+
+    stage('Deploy To EKS') {
+      steps {
+        sh 'kubectl apply -f deployment/phase-07-cicd-self-hosted/phase-7-cicd-jenkins/k8s/namespace.yaml'
+        sh 'kubectl apply -f deployment/phase-07-cicd-self-hosted/phase-7-cicd-jenkins/k8s/storageclass.yaml'
+        sh '''
+          kubectl create configmap launchboard-config \
+            --namespace "${NAMESPACE}" \
+            --from-literal=APP_NAME="DevOps LaunchBoard API" \
+            --from-literal=APP_ENV=production \
+            --from-literal=CORS_ORIGINS="http://placeholder.invalid" \
+            --from-literal=SEED_DEMO_DATA=true \
+            --from-literal=POSTGRES_DB=launchboard \
+            --from-literal=POSTGRES_USER=launchboard_user \
+            --dry-run=client -o yaml | kubectl apply -f -
+        '''
+        sh '''
+          kubectl create secret generic launchboard-secret \
+            --namespace "${NAMESPACE}" \
+            --from-literal=POSTGRES_PASSWORD="${DB_PASSWORD}" \
+            --from-literal=DATABASE_URL="postgresql+asyncpg://launchboard_user:${DB_PASSWORD}@launchboard-db:5432/launchboard" \
+            --dry-run=client -o yaml | kubectl apply -f -
+        '''
+        sh 'kubectl -n "${NAMESPACE}" delete job launchboard-migrate --ignore-not-found'
+        sh 'kubectl apply -k deployment/phase-07-cicd-self-hosted/phase-7-cicd-jenkins/k8s'
+        sh 'kubectl -n "${NAMESPACE}" rollout status deployment/launchboard-db --timeout=180s'
+        sh 'kubectl -n "${NAMESPACE}" wait --for=condition=complete job/launchboard-migrate --timeout=180s'
+        sh 'kubectl -n "${NAMESPACE}" rollout status deployment/launchboard-backend --timeout=180s'
+        sh 'kubectl -n "${NAMESPACE}" rollout status deployment/launchboard-frontend --timeout=180s'
+      }
+    }
+
+    stage('Wait For ALB And Fix CORS') {
+      steps {
+        script {
+          def albDns = ''
+          for (int i = 0; i < 30; i++) {
+            albDns = sh(
+              script: "kubectl -n ${env.NAMESPACE} get ingress launchboard-ingress -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true",
+              returnStdout: true
+            ).trim()
+            if (albDns) {
+              break
+            }
+            echo "Waiting for ALB hostname... (${i + 1}/30)"
+            sleep(10)
+          }
+          if (!albDns) {
+            error 'ALB hostname did not appear within 5 minutes. Check the aws-load-balancer-controller logs.'
+          }
+          env.ALB_DNS = albDns
+        }
+        sh '''
+          kubectl create configmap launchboard-config \
+            --namespace "${NAMESPACE}" \
+            --from-literal=APP_NAME="DevOps LaunchBoard API" \
+            --from-literal=APP_ENV=production \
+            --from-literal=CORS_ORIGINS="http://${ALB_DNS}" \
+            --from-literal=SEED_DEMO_DATA=true \
+            --from-literal=POSTGRES_DB=launchboard \
+            --from-literal=POSTGRES_USER=launchboard_user \
+            --dry-run=client -o yaml | kubectl apply -f -
+          kubectl -n "${NAMESPACE}" rollout restart deployment/launchboard-backend
+          kubectl -n "${NAMESPACE}" rollout status deployment/launchboard-backend --timeout=180s
+        '''
+      }
+    }
+
+    stage('Verify Application') {
+      steps {
+        sh '''
+          curl -fsS "http://${ALB_DNS}/healthz"
+          curl -fsS "http://${ALB_DNS}/health"
+          curl -fsS "http://${ALB_DNS}/ready"
+          curl -fsS "http://${ALB_DNS}/api/summary" | head -c 400
+          echo ""
+          echo "Deployment of ${IMAGE_TAG} verified at http://${ALB_DNS}"
+        '''
+      }
+    }
+  }
+
+  post {
+    always {
+      sh '''
+        git checkout -- deployment/phase-07-cicd-self-hosted/phase-7-cicd-jenkins/k8s/launchboard-backend-deployment.yaml \
+          deployment/phase-07-cicd-self-hosted/phase-7-cicd-jenkins/k8s/launchboard-frontend-deployment.yaml \
+          deployment/phase-07-cicd-self-hosted/phase-7-cicd-jenkins/k8s/launchboard-migration-job.yaml || true
+      '''
+    }
+  }
+}
